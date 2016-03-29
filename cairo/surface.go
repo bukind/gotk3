@@ -24,6 +24,8 @@ type Surface struct {
 	surface *C.cairo_surface_t
 }
 
+// NewSurfaceFromPNG is a wrapper around cairo_image_surface_from_png.
+// It tries to load an image from the png file.
 func NewSurfaceFromPNG(fileName string) (*Surface, error) {
 
 	cstr := C.CString(fileName)
@@ -33,9 +35,23 @@ func NewSurfaceFromPNG(fileName string) (*Surface, error) {
 
 	status := Status(C.cairo_surface_status(surfaceNative))
 	if status != STATUS_SUCCESS {
+		// TODO(bukind): Will it leak surfaceNative in case of error?
 		return nil, ErrorStatus(status)
 	}
 
+	return &Surface{surfaceNative}, nil
+}
+
+// NewSurfaceImage is a wrapper around cairo_image_surface_create.
+// It might be useful for the target surface creation.
+func NewSurfaceImage(format Format, width, height int) (*Surface, error) {
+	surfaceNative := C.cairo_image_surface_create(C.cairo_format_t(format),
+		C.int(width), C.int(height))
+	status := Status(C.cairo_surface_status(surfaceNative))
+	if status != STATUS_SUCCESS {
+		// TODO(bukind): Will it leak surfaceNative in case of error?
+		return nil, ErrorStatus(status)
+	}
 	return &Surface{surfaceNative}, nil
 }
 
@@ -204,3 +220,29 @@ func (v *Surface) GetMimeData(mimeType MimeType) []byte {
 // TODO(jrick) MapToImage (since 1.12)
 
 // TODO(jrick) UnmapImage (since 1.12)
+
+// WriteToPng is a wrapped around cairo_surface_write_to_png.
+func (v *Surface) WriteToPng(filename string) error {
+	cstr := C.CString(filename)
+	defer C.free(unsafe.Pointer(cstr))
+	status := Status(C.cairo_surface_write_to_png(v.native(), cstr))
+	if status != STATUS_SUCCESS {
+		return ErrorStatus(status)
+	}
+	return nil
+}
+
+func (v *Surface) GetImageFormat() Format {
+	c := C.cairo_image_surface_get_format(v.native())
+	return Format(c)
+}
+
+func (v *Surface) GetImageWidth() int {
+	c := C.cairo_image_surface_get_width(v.native())
+	return int(c)
+}
+
+func (v *Surface) GetImageHeight() int {
+	c := C.cairo_image_surface_get_height(v.native())
+	return int(c)
+}
